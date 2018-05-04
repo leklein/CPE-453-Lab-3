@@ -8,15 +8,23 @@
 system_t sysArray;
 
 uint16_t get_time() {
-    return sysArray.num_interrupts / 100;
+   return sysArray.num_interrupts / 100;
+}
+
+uint16_t get_thread_id() {
+   return sysArray.currThread;
 }
 
 uint8_t get_next_thread() {
+   //TODO modify so it picks only threads that are waiting, and updates sleep counters
+   //TODO add sleep counters or some way to track sleeping threads
+   //TODO maybe that should go in the ISR
+   //TODO ask seng whether we need two ISRs
    return (sysArray.currThread+1) % sysArray.threadsUsed;
 }
 
 uint8_t get_num_threads() {
-    return sysArray.threadsUsed;
+   return sysArray.threadsUsed;
 }
 
 __attribute__((naked)) void context_switch(uint16_t* new_tp, uint16_t* old_tp) {
@@ -84,6 +92,23 @@ __attribute__((naked)) void context_switch(uint16_t* new_tp, uint16_t* old_tp) {
    asm volatile("ret"); //return to ISR
 }
 
+void yield() {
+   cli();
+
+   uint8_t old_tid = get_thread_id();
+   //if current thread is not waiting or sleeping, set status to THREAD_READY
+   if(sysArray.array[old_tid].thread_status == THREAD_RUNNING) {
+      sysArray.array[old_tid].thread_status = THREAD_READY;
+   }
+
+   sysArray.currThread = get_next_thread();
+
+   context_switch((uint16_t*)&sysArray.array[sysArray.currThread].stackPtr,
+      (uint16_t*)&sysArray.array[old_tid].stackPtr);
+
+   sei();
+}
+
 //This interrupt routine is automatically run every 10 milliseconds
 ISR(TIMER0_COMPA_vect) {
    //The following statement tells GCC that it can use registers r18-r31,
@@ -92,15 +117,14 @@ ISR(TIMER0_COMPA_vect) {
    asm volatile ("" : : : "r18", "r19", "r20", "r21", "r22", "r23", "r24", \
                  "r25", "r26", "r27", "r30", "r31");
 
-   uint8_t old = sysArray.currThread;
    sysArray.num_interrupts++;
-   
-   //Call get_next_thread to get the thread id of the next thread to run
+
+   uint8_t old_tid = get_thread_id();
    sysArray.currThread = get_next_thread();
 
    //Call context switch here to switch to that next thread
    context_switch((uint16_t*)&sysArray.array[sysArray.currThread].stackPtr,
-    (uint16_t*)&sysArray.array[old].stackPtr);
+      (uint16_t*)&sysArray.array[old_tid].stackPtr);
 }
 
 //Call this to start the system timer interrupt
@@ -150,30 +174,32 @@ __attribute__((naked)) void thread_start(void) {
 void create_thread(char* name, uint16_t address, void* args, uint16_t stack_size) {
    sysArray.array[sysArray.threadsUsed].thread_id = sysArray.threadsUsed;
    strncpy(sysArray.array[sysArray.threadsUsed].name,name,9);
+   sysArray.array[sysArray.threadsUsed].thread_status = THREAD_READY;
+   sysArray.array[sysArray.threadsUsed].sched_count = 0;
 
    sysArray.array[sysArray.threadsUsed].func = address;
 
    // Malloc space for the stack.
    sysArray.array[sysArray.threadsUsed].size = sizeof(regs_context_switch) +
-    sizeof(regs_interrupt) + stack_size;
+      sizeof(regs_interrupt) + stack_size;
    sysArray.array[sysArray.threadsUsed].stack = 
-    malloc(sysArray.array[sysArray.threadsUsed].size);
+      malloc(sysArray.array[sysArray.threadsUsed].size);
 
    // Move stack pointer to the top.
    sysArray.array[sysArray.threadsUsed].stackPtr = 
-    sysArray.array[sysArray.threadsUsed].stack +
-    sizeof(regs_context_switch) + sizeof(regs_interrupt) + stack_size - 1;
+      sysArray.array[sysArray.threadsUsed].stack +
+      sizeof(regs_context_switch) + sizeof(regs_interrupt) + stack_size - 1;
 
    // Record high address of stack.
    sysArray.array[sysArray.threadsUsed].stackBase =
-    sysArray.array[sysArray.threadsUsed].stackPtr;
+      sysArray.array[sysArray.threadsUsed].stackPtr;
 
    // Move stack pointer to where it needs to be to pop the registers.
    sysArray.array[sysArray.threadsUsed].stackPtr -= sizeof(regs_context_switch);
 
    // Prepare the stack for context_switch.
    regs_context_switch *ptr = 
-    (void*)sysArray.array[sysArray.threadsUsed].stackPtr;
+      (void*)sysArray.array[sysArray.threadsUsed].stackPtr;
    ptr->pcl = (uint16_t)thread_start&0xFF;
    ptr->pch = (uint16_t)thread_start>>8;
    ptr->eind= (uint16_t)0;

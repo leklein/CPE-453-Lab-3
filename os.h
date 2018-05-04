@@ -1,11 +1,6 @@
 #ifndef OS_H
 #define OS_H
 
-#define THREAD_RUNNING 1
-#define THREAD_READY 2
-#define THREAD_SLEEPING 3
-#define THREAD_WAITING 4
-
 //This structure defines the register order pushed to the stack on a
 //system context switch.
 typedef struct regs_context_switch {
@@ -68,6 +63,8 @@ uint16_t get_time();
 void os_start();
 void os_init();
 void create_thread(char *n, uint16_t address, void* args, uint16_t stack_size);
+uint16_t get_thread_id();
 uint8_t get_num_threads();
+void yield();
 
 #endif

@@ -1,8 +1,12 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
+#include <stdlib.h>
 #include "globals.h"
 #include "os.h"
+#include "synchro.h"
+
+//mutex_t mutex_lock_1;
 
 void led_on() {
    asm volatile ("LDI R31, 0x00");
@@ -49,7 +53,22 @@ void blink(uint16_t *delay) {
    }
 }
 
-void stats(uint8_t *str) {
+void producer() {
+   while(1) {
+
+      _delay_ms(200);
+      print_string("P");
+   }
+}
+
+void consumer() {
+   while(1) {
+      _delay_ms(100);
+      print_string("C");
+   }
+}
+
+void display_stats(uint8_t *str) {
    _delay_ms(1500);
    clear_screen();
 
@@ -70,14 +89,31 @@ void stats(uint8_t *str) {
    }
 }
 
+void display_buffer() {
+   while(1) {
+      _delay_ms(1000);
+      print_string("B");
+   }
+}
+
 void main(void) {
-   uint16_t delay = 50;
+   uint16_t blink_delay = 50;
    uint8_t string[15] = "Program 3";
 
    os_init();
 
-   create_thread("blink", (uint16_t)blink, (void*)&delay, 50);
-   create_thread("stats", (uint16_t)stats, (void*)string, 50);
+   //mutex_init(&mutex_lock_1);
+
+   create_thread("producer", (uint16_t)producer, (void*)NULL, 50);
+   create_thread("consumer", (uint16_t)consumer, (void*)NULL, 50);
+   //create_thread("stats", (uint16_t)display_stats, (void*)string, 50);
+   //create_thread("buffer", (uint16_t)display_buffer, (void*)NULL, 50);
+   //create_thread("blink", (uint16_t)blink, (void*)&blink_delay, 50);
 
    os_start();
+
+   while(1) {
+      //TODO delete
+      print_string("M");
+   }
 }

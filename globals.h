@@ -23,9 +23,15 @@ void set_cursor(uint8_t row, uint8_t col);
 void set_color(uint8_t color);
 void clear_screen(void);
 
-//place defines and prototypes here
+#define THREAD_RUNNING 1
+#define THREAD_READY 2
+#define THREAD_SLEEPING 3
+#define THREAD_WAITING 4
+
 typedef struct thread_t {
    uint8_t thread_id;
+   uint8_t thread_status;
+   uint8_t sched_count;
    char name[10];
    uint16_t func;
    uint8_t *stack;
