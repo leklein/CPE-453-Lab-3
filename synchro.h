@@ -14,7 +14,9 @@ typedef struct mutex_t {
 } mutex_t;
 
 typedef struct semaphore_t {
-   
+   uint8_t magnitude; // number of threads that can have it
+   uint8_t num_remaining;
+   uint16_t *waitlist;
 } semaphore_t;
 
 void mutex_init(struct mutex_t* m);

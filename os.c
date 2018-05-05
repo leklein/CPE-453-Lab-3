@@ -102,6 +102,7 @@ void yield() {
    }
 
    sysArray.currThread = get_next_thread();
+   sysArray.array[sysArray.currThread].thread_status = THREAD_READY;
 
    context_switch((uint16_t*)&sysArray.array[sysArray.currThread].stackPtr,
       (uint16_t*)&sysArray.array[old_tid].stackPtr);
