@@ -54,16 +54,7 @@ void producer() {
 
 void consumer() {
    while(1) {
-      /*print_string("c *");
-      print_int(sysArray.array[0].thread_status);
-      print_int(sysArray.array[1].thread_status);
-      print_int(sysArray.array[2].thread_status);
-      print_int(sysArray.array[3].thread_status);
-      print_int(sysArray.array[4].thread_status);
-      print_int(sysArray.array[5].thread_status);
-      print_string("* ");
-      //print_string("C");*/
-      //thread_sleep(100);
+
    }
 }
 

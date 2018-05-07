@@ -143,14 +143,6 @@ ISR(TIMER0_COMPA_vect) {
    asm volatile ("" : : : "r18", "r19", "r20", "r21", "r22", "r23", "r24", \
                  "r25", "r26", "r27", "r30", "r31");
 
-   print_string("*");
-   print_int(sysArray.array[0].thread_status);
-   print_int(sysArray.array[1].thread_status);
-   print_int(sysArray.array[2].thread_status);
-   print_int(sysArray.array[3].thread_status);
-   print_int(sysArray.array[4].thread_status);
-   print_int(sysArray.array[5].thread_status);
-   print_string("* ");
 
    //decrement the counts for all sleeping threads
    //if a thread has only one tick remaining, set the status of the thread to ready

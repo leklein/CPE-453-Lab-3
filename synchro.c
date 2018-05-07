@@ -15,8 +15,8 @@ void add_to_mutex_waitlist(struct mutex_t *m, uint8_t tid) {
 
 uint8_t pop_from_mutex_waitlist(struct mutex_t *m) {
    uint8_t popped_tid;
-   //if waitlist buffer is empty, return -1
-   if (m->waitlist.head == m->waitlist.tail) return -1;
+   //if waitlist buffer is empty, return 255
+   if (m->waitlist.head == m->waitlist.tail) return 255;
    //otherwise, pop the tid and increment the head of the list
    popped_tid = m->waitlist.list[m->waitlist.head];
    m->waitlist.head = (m->waitlist.head + 1) % 8;
@@ -31,8 +31,8 @@ void add_to_sem_waitlist(struct semaphore_t *s, uint8_t tid) {
 
 uint8_t pop_from_sem_waitlist(struct semaphore_t *s) {
    uint8_t popped_tid;
-   //if waitlist buffer is empty, return -1
-   if (s->waitlist.head == s->waitlist.tail) return -1;
+   //if waitlist buffer is empty, return 255
+   if (s->waitlist.head == s->waitlist.tail) return 255;
    //otherwise, pop the tid and increment the head of the list
    popped_tid = s->waitlist.list[s->waitlist.head];
    s->waitlist.head = (s->waitlist.head + 1) % 8;
@@ -44,7 +44,8 @@ void mutex_init(struct mutex_t* m) {
    cli();
    //initialize mutex values
    m->is_locked = 0;
-   m->owner_tid = -1;
+   m->owner_tid = 255
+   ;
    m->waitlist.head = 0;
    m->waitlist.tail = 0;
    //enable interrupts
@@ -55,25 +56,29 @@ void mutex_lock(struct mutex_t* m) {
    uint8_t tid;
    //disable interrupts
    cli();
+   //print_string("in mutex lock- beginning");
    //get current thread id
    tid = get_thread_id();
+   //print_string("[tid in lock: ");
+   //print_int(tid);
+   //print_string("]\n");
    //if mutex lock is in use by the same thread, do nothing
    //if it is in use by a different thread, add to waitlist
    if (m->is_locked) { 
       if (m->owner_tid != tid) {
-         print_string("-mutex lock 1-");
+         //print_string("-mutex lock 1-");
          add_to_mutex_waitlist(m, tid);
          sysArray.array[tid].thread_status = THREAD_WAITING;
          yield();
       }
       else {
-         print_string("-mutex lock 0-");
+         //print_string("-mutex lock 0-");
       }
-      print_string("-mutex lock 3-");
+      //print_string("-mutex lock 3-");
    }
    //if mutex lock is not in use, give it to the thread
    else {
-      print_string("-mutex lock 2-");
+      //print_string("-mutex lock 2-");
       m->is_locked = 1;
       m->owner_tid = tid;
    }
@@ -82,11 +87,17 @@ void mutex_lock(struct mutex_t* m) {
 }
 
 void mutex_unlock(struct mutex_t* m) {
+   
    uint8_t tid, new_tid;
    //disable interrupts
    cli();
    //get current thread id
+   //print_string("in mutex unlock");
+
    tid = get_thread_id();
+   //print_string("[tid in unlock: ");
+   //print_int(tid);
+   //print_string("]\n");
    //if mutex lock is unlocked, do nothing
    //if mutex lock is locked, check if it's owned by current thread
    if (m->is_locked) {
@@ -95,14 +106,14 @@ void mutex_unlock(struct mutex_t* m) {
       if (m->owner_tid == tid) {
          new_tid = pop_from_mutex_waitlist(m);
          //if no other threads waiting
-         if (new_tid == -1) {
-            print_string("-mutex unlock 1-");
+         if (new_tid == 255) {
+            //print_string("-mutex unlock 1-");
             m->is_locked = 0;
-            m->owner_tid = -1;
+            m->owner_tid = 255;
          }
          //if there is another thread waiting
          else {
-            print_string("-mutex unlock 2-");
+            //print_string("-mutex unlock 2-");
             m->owner_tid = new_tid;
             sysArray.array[new_tid].thread_status = THREAD_READY;
          }
@@ -144,7 +155,7 @@ void sem_signal(struct semaphore_t* s) {
 
    s->value++;
    uint8_t new_tid = pop_from_sem_waitlist(s);
-   if (new_tid != -1) {
+   if (new_tid != 255) {
       sysArray.array[new_tid].thread_status = THREAD_READY;
    }
    //enable interrupts
@@ -157,7 +168,7 @@ void sem_signal_swap(struct semaphore_t* s) {
    s->value++;
    uint8_t new_tid = pop_from_sem_waitlist(s);
    uint8_t old_tid = get_thread_id();
-   if (new_tid != -1) {
+   if (new_tid != 255) {
       sysArray.array[old_tid].thread_status = THREAD_READY;
       sysArray.array[new_tid].thread_status = THREAD_RUNNING;
       context_switch((uint16_t*)&sysArray.array[new_tid].stackPtr,
