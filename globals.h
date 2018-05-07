@@ -43,6 +43,7 @@ typedef struct thread_t {
 typedef struct system_t {
    thread_t array[8];
    uint8_t threadsUsed;
+   uint16_t sleep_counts[8];
    uint8_t currThread;
    uint16_t num_interrupts;
 } system_t;

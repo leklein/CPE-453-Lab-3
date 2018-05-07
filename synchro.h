@@ -1,22 +1,21 @@
 #ifndef SYNCHRO_H
 #define SYNCHRO_H
 
-typedef struct waitlist_node {
-   uint16_t tid;
-   struct waitlist_node *next;
-} waitlist_node;
+typedef struct waitlist_buffer {
+   uint8_t list[8];
+   uint8_t head;
+   uint8_t tail;
+} waitlist_buffer;
 
 typedef struct mutex_t {
-   uint8_t mid;
    uint8_t owner_tid;
    uint8_t is_locked;
-   uint16_t *waitlist;
+   waitlist_buffer waitlist;
 } mutex_t;
 
 typedef struct semaphore_t {
-   uint8_t magnitude; // number of threads that can have it
-   uint8_t num_remaining;
-   uint16_t *waitlist;
+   uint8_t value;
+   waitlist_buffer waitlist;
 } semaphore_t;
 
 void mutex_init(struct mutex_t* m);

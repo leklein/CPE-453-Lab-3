@@ -63,8 +63,10 @@ uint16_t get_time();
 void os_start();
 void os_init();
 void create_thread(char *n, uint16_t address, void* args, uint16_t stack_size);
-uint16_t get_thread_id();
+uint8_t get_thread_id();
 uint8_t get_num_threads();
+void thread_sleep(uint16_t ticks);
 void yield();
+__attribute__((naked)) void context_switch(uint16_t* new_tp, uint16_t* old_tp);
 
 #endif

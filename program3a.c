@@ -6,7 +6,8 @@
 #include "os.h"
 #include "synchro.h"
 
-//mutex_t mutex_lock_1;
+mutex_t mutex_screen;
+extern system_t sysArray;
 
 void led_on() {
    asm volatile ("LDI R31, 0x00");
@@ -37,62 +38,79 @@ void led_off() {
 }
 
 void blink(uint16_t *delay) {
-   uint16_t i=*delay;
-   uint16_t j=i;
-
    while(1) {
-      i=j;
       led_off();
-      while(i--)
-         _delay_ms(1);
-
-      i=j;
+      thread_sleep((*delay)/10);
       led_on();
-      while(i--)
-         _delay_ms(1);
+      thread_sleep((*delay)/10);
    }
 }
 
 void producer() {
    while(1) {
-
-      _delay_ms(200);
-      print_string("P");
+      //thread_sleep(100);
    }
 }
 
 void consumer() {
    while(1) {
-      _delay_ms(100);
-      print_string("C");
+      /*print_string("c *");
+      print_int(sysArray.array[0].thread_status);
+      print_int(sysArray.array[1].thread_status);
+      print_int(sysArray.array[2].thread_status);
+      print_int(sysArray.array[3].thread_status);
+      print_int(sysArray.array[4].thread_status);
+      print_int(sysArray.array[5].thread_status);
+      print_string("* ");
+      //print_string("C");*/
+      //thread_sleep(100);
    }
 }
 
 void display_stats(uint8_t *str) {
-   _delay_ms(1500);
+   thread_sleep(150);
    clear_screen();
 
    while(1) {
+      mutex_lock(&mutex_screen);
+
+      /*print_string("d ");
       set_color(YELLOW);
-      set_cursor(1, 1);
+      set_cursor(12, 1);
       print_string(str);
 
-      set_cursor(2, 1);
+      set_cursor(13, 1);
       set_color(32);
       print_string("Time: ");
       print_int(get_time());
 
-      set_cursor(4, 1);
+      set_cursor(14, 1);
       set_color(36);
       print_string("Number of threads: ");
-      print_int(get_num_threads());
+      print_int(get_num_threads());*/
+      print_string("D");
+
+      mutex_unlock(&mutex_screen);
+      thread_sleep(10);
    }
 }
 
 void display_buffer() {
    while(1) {
-      _delay_ms(1000);
+      mutex_lock(&mutex_screen);
+
+      //set_color(RED);
+      //set_cursor(1, 1);
       print_string("B");
+
+      mutex_unlock(&mutex_screen);
+      thread_sleep(10);
+   }
+}
+
+void idle() {
+   while(1) {
+      print_string("i");
    }
 }
 
@@ -102,18 +120,21 @@ void main(void) {
 
    os_init();
 
-   //mutex_init(&mutex_lock_1);
+   mutex_init(&mutex_screen);
+   //record information about main thread
 
+   //TODO change the "idle" thread to actually be in main, not idle()
+   create_thread("main", (uint16_t)idle, (void*)NULL, 50);
    create_thread("producer", (uint16_t)producer, (void*)NULL, 50);
    create_thread("consumer", (uint16_t)consumer, (void*)NULL, 50);
-   //create_thread("stats", (uint16_t)display_stats, (void*)string, 50);
-   //create_thread("buffer", (uint16_t)display_buffer, (void*)NULL, 50);
-   //create_thread("blink", (uint16_t)blink, (void*)&blink_delay, 50);
+   create_thread("stats", (uint16_t)display_stats, (void*)string, 50);
+   create_thread("buffer", (uint16_t)display_buffer, (void*)NULL, 50);
+   create_thread("blink", (uint16_t)blink, (void*)&blink_delay, 50);
 
    os_start();
-
+   sei();
    while(1) {
       //TODO delete
-      print_string("M");
+      //print_string("M");
    }
 }

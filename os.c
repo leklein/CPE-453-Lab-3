@@ -11,16 +11,27 @@ uint16_t get_time() {
    return sysArray.num_interrupts / 100;
 }
 
-uint16_t get_thread_id() {
+uint8_t get_thread_id() {
    return sysArray.currThread;
 }
 
 uint8_t get_next_thread() {
-   //TODO modify so it picks only threads that are waiting, and updates sleep counters
-   //TODO add sleep counters or some way to track sleeping threads
-   //TODO maybe that should go in the ISR
-   //TODO ask seng whether we need two ISRs
-   return (sysArray.currThread+1) % sysArray.threadsUsed;
+   uint8_t count = 0;
+   uint8_t next_thread = (sysArray.currThread+1) % sysArray.threadsUsed;
+   if (next_thread == 0) next_thread = 1;
+   //cycle through threads until we've reached one ready to run
+   //keep 
+   while (sysArray.array[next_thread].thread_status != THREAD_READY &&
+          count < (sysArray.threadsUsed - 1))
+   {
+      next_thread = (next_thread+1) % sysArray.threadsUsed;
+      if (next_thread == 0) next_thread = 1;
+      count++;
+   }
+
+   if (sysArray.array[next_thread].thread_status = THREAD_READY)
+      return next_thread;
+   else return 0;
 }
 
 uint8_t get_num_threads() {
@@ -92,7 +103,21 @@ __attribute__((naked)) void context_switch(uint16_t* new_tp, uint16_t* old_tp) {
    asm volatile("ret"); //return to ISR
 }
 
+void thread_sleep(uint16_t ticks) {
+   //disable interrupts
+   cli();
+   //set thread status to sleeping, and set sleep count
+   uint8_t current_tid = get_thread_id();
+   sysArray.array[current_tid].thread_status = THREAD_SLEEPING;
+   sysArray.sleep_counts[current_tid] = ticks;
+   //immediately switch to another thread
+   yield();
+   //enable interrupts
+   sei();
+}
+
 void yield() {
+   //disable interrupts
    cli();
 
    uint8_t old_tid = get_thread_id();
@@ -100,30 +125,50 @@ void yield() {
    if(sysArray.array[old_tid].thread_status == THREAD_RUNNING) {
       sysArray.array[old_tid].thread_status = THREAD_READY;
    }
-
    sysArray.currThread = get_next_thread();
-   sysArray.array[sysArray.currThread].thread_status = THREAD_READY;
+   sysArray.array[sysArray.currThread].thread_status = THREAD_RUNNING;
 
    context_switch((uint16_t*)&sysArray.array[sysArray.currThread].stackPtr,
       (uint16_t*)&sysArray.array[old_tid].stackPtr);
-
+   //enable interrupts
    sei();
 }
 
 //This interrupt routine is automatically run every 10 milliseconds
 ISR(TIMER0_COMPA_vect) {
+   uint8_t i;
    //The following statement tells GCC that it can use registers r18-r31,
    //for this interrupt routine.  These registers (along with r0 and r1) 
    //will automatically be pushed and popped by this interrupt routine.
    asm volatile ("" : : : "r18", "r19", "r20", "r21", "r22", "r23", "r24", \
                  "r25", "r26", "r27", "r30", "r31");
 
-   sysArray.num_interrupts++;
+   print_string("*");
+   print_int(sysArray.array[0].thread_status);
+   print_int(sysArray.array[1].thread_status);
+   print_int(sysArray.array[2].thread_status);
+   print_int(sysArray.array[3].thread_status);
+   print_int(sysArray.array[4].thread_status);
+   print_int(sysArray.array[5].thread_status);
+   print_string("* ");
 
+   //decrement the counts for all sleeping threads
+   //if a thread has only one tick remaining, set the status of the thread to ready
+   for (i = 0; i < sysArray.threadsUsed; i++) {
+      if (sysArray.sleep_counts[i] > 1) sysArray.sleep_counts[i]--;
+      else if (sysArray.sleep_counts[i] == 1) {
+         sysArray.sleep_counts[i]--;
+         sysArray.array[i].thread_status = THREAD_READY;
+      }
+   }
+
+   sysArray.num_interrupts++;
    uint8_t old_tid = get_thread_id();
    sysArray.currThread = get_next_thread();
 
    //Call context switch here to switch to that next thread
+   sysArray.array[old_tid].thread_status = THREAD_READY;
+   sysArray.array[sysArray.currThread].thread_status = THREAD_RUNNING;
    context_switch((uint16_t*)&sysArray.array[sysArray.currThread].stackPtr,
       (uint16_t*)&sysArray.array[old_tid].stackPtr);
 }
@@ -176,6 +221,7 @@ void create_thread(char* name, uint16_t address, void* args, uint16_t stack_size
    sysArray.array[sysArray.threadsUsed].thread_id = sysArray.threadsUsed;
    strncpy(sysArray.array[sysArray.threadsUsed].name,name,9);
    sysArray.array[sysArray.threadsUsed].thread_status = THREAD_READY;
+   sysArray.sleep_counts[sysArray.threadsUsed] = 0;
    sysArray.array[sysArray.threadsUsed].sched_count = 0;
 
    sysArray.array[sysArray.threadsUsed].func = address;
