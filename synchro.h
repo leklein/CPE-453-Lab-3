@@ -14,7 +14,7 @@ typedef struct mutex_t {
 } mutex_t;
 
 typedef struct semaphore_t {
-   uint8_t value;
+   int8_t value;
    waitlist_buffer waitlist;
 } semaphore_t;
 

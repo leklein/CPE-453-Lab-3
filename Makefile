@@ -3,10 +3,10 @@
 #DEVICE = /dev/tty.usbmodem1431
 
 #Linux (/dev/ttyACM0 or possibly /dev/ttyUSB0)
-DEVICE = /dev/ttyACM0 
+#DEVICE = /dev/ttyACM0 
 
 #Windows
-#DEVICE = COM3 
+DEVICE = COM3 
 
 #program3a target to compile the code and flash to the arduino
 program_3a: program3a.c os.c serial.c synchro.c

@@ -20,7 +20,6 @@ uint8_t get_next_thread() {
    uint8_t next_thread = (sysArray.currThread+1) % sysArray.threadsUsed;
    if (next_thread == 0) next_thread = 1;
    //cycle through threads until we've reached one ready to run
-   //keep 
    while (sysArray.array[next_thread].thread_status != THREAD_READY &&
           count < (sysArray.threadsUsed - 1))
    {
@@ -127,7 +126,7 @@ void yield() {
    }
    sysArray.currThread = get_next_thread();
    sysArray.array[sysArray.currThread].thread_status = THREAD_RUNNING;
-
+   sysArray.sched_counts[sysArray.currThread]++;
    context_switch((uint16_t*)&sysArray.array[sysArray.currThread].stackPtr,
       (uint16_t*)&sysArray.array[old_tid].stackPtr);
    //enable interrupts
@@ -161,18 +160,36 @@ ISR(TIMER0_COMPA_vect) {
    //Call context switch here to switch to that next thread
    sysArray.array[old_tid].thread_status = THREAD_READY;
    sysArray.array[sysArray.currThread].thread_status = THREAD_RUNNING;
+   sysArray.sched_counts[sysArray.currThread]++;
    context_switch((uint16_t*)&sysArray.array[sysArray.currThread].stackPtr,
       (uint16_t*)&sysArray.array[old_tid].stackPtr);
 }
 
+//This interrupt routine is run once a second
+ISR(TIMER1_COMPA_vect) {
+   uint8_t i;
+   //reset sched counts, and move them over to be displayed in thread stats
+   for (i = 0; i < sysArray.threadsUsed; i++) {
+      sysArray.array[i].sched_count = sysArray.sched_counts[i];
+      sysArray.sched_counts[i] = 0;
+   }
+}
+
 //Call this to start the system timer interrupt
 void start_system_timer() {
+   //start timer 0 for OS system interrupt
    TIMSK0 |= _BV(OCIE0A);  //interrupt on compare match
    TCCR0A |= _BV(WGM01);   //clear timer on compare match
 
    //Generate timer interrupt every ~10 milliseconds
-   TCCR0B |= _BV(CS02) | _BV(CS00) | _BV(CS02);     //prescalar /1024
+   TCCR0B |= _BV(CS02) | _BV(CS00);    //prescalar /1024
    OCR0A = 156;             //generate interrupt every 9.98 milliseconds
+
+   //start timer 1 to generate interrupt every 1 second
+   OCR1A = 15625;
+   TIMSK1 |= _BV(OCIE1A);  //interrupt on compare
+   TCCR1B |= _BV(WGM12) | _BV(CS12) | _BV(CS10); //slowest prescalar /1024
+
 }
 
 void os_init() {
@@ -197,8 +214,9 @@ void os_start() {
    sei();
 
    //context switch
-   uint16_t temp;
-   context_switch((uint16_t*)&sysArray.array[0].stackPtr,&temp);
+   uint8_t first_tid = get_next_thread();
+   context_switch((uint16_t*)&sysArray.array[first_tid].stackPtr,
+                  (uint16_t*)&sysArray.array[0].stackPtr);
 }
 
 __attribute__((naked)) void thread_start(void) {
@@ -214,6 +232,7 @@ void create_thread(char* name, uint16_t address, void* args, uint16_t stack_size
    strncpy(sysArray.array[sysArray.threadsUsed].name,name,9);
    sysArray.array[sysArray.threadsUsed].thread_status = THREAD_READY;
    sysArray.sleep_counts[sysArray.threadsUsed] = 0;
+   sysArray.sched_counts[sysArray.threadsUsed] = 0;
    sysArray.array[sysArray.threadsUsed].sched_count = 0;
 
    sysArray.array[sysArray.threadsUsed].func = address;

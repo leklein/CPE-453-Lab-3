@@ -1,5 +1,6 @@
 #include <avr/interrupt.h>
 #include <avr/io.h>
+#include <util/delay.h>
 #include <stdlib.h>
 #include "globals.h"
 #include "os.h"
@@ -44,8 +45,7 @@ void mutex_init(struct mutex_t* m) {
    cli();
    //initialize mutex values
    m->is_locked = 0;
-   m->owner_tid = 255
-   ;
+   m->owner_tid = 255;
    m->waitlist.head = 0;
    m->waitlist.tail = 0;
    //enable interrupts
@@ -87,17 +87,11 @@ void mutex_lock(struct mutex_t* m) {
 }
 
 void mutex_unlock(struct mutex_t* m) {
-   
    uint8_t tid, new_tid;
    //disable interrupts
    cli();
    //get current thread id
-   //print_string("in mutex unlock");
-
    tid = get_thread_id();
-   //print_string("[tid in unlock: ");
-   //print_int(tid);
-   //print_string("]\n");
    //if mutex lock is unlocked, do nothing
    //if mutex lock is locked, check if it's owned by current thread
    if (m->is_locked) {
@@ -107,13 +101,11 @@ void mutex_unlock(struct mutex_t* m) {
          new_tid = pop_from_mutex_waitlist(m);
          //if no other threads waiting
          if (new_tid == 255) {
-            //print_string("-mutex unlock 1-");
             m->is_locked = 0;
             m->owner_tid = 255;
          }
          //if there is another thread waiting
          else {
-            //print_string("-mutex unlock 2-");
             m->owner_tid = new_tid;
             sysArray.array[new_tid].thread_status = THREAD_READY;
          }
@@ -135,27 +127,30 @@ void sem_init(struct semaphore_t* s, int8_t value) {
 }
 
 void sem_wait(struct semaphore_t* s) {
+   uint8_t tid;
    //disable interrupts
    cli();
-
+   //get current thread id
+   tid = get_thread_id();
+   //decrement semaphore value
    s->value--;
    if (s->value < 0) {
-       uint8_t tid = get_thread_id();
-       add_to_sem_waitlist(s, tid);
-       sysArray.array[tid].thread_status = THREAD_WAITING;
-       yield();
+      add_to_sem_waitlist(s, tid);
+      sysArray.array[tid].thread_status = THREAD_WAITING;
+      yield();
    } 
    //enable interrupts
    sei();
 }
 
 void sem_signal(struct semaphore_t* s) {
+   uint8_t new_tid;
    //disable interrupts
    cli();
-
+   //increment semaphore value
    s->value++;
-   uint8_t new_tid = pop_from_sem_waitlist(s);
-   if (new_tid != 255) {
+   if (s->value <= 0) {
+      new_tid = pop_from_sem_waitlist(s);
       sysArray.array[new_tid].thread_status = THREAD_READY;
    }
    //enable interrupts
@@ -163,15 +158,20 @@ void sem_signal(struct semaphore_t* s) {
 }
 
 void sem_signal_swap(struct semaphore_t* s) {
+   uint8_t old_tid;
    //disable interrupts
    cli();
+   //increment semaphore value
    s->value++;
-   uint8_t new_tid = pop_from_sem_waitlist(s);
-   uint8_t old_tid = get_thread_id();
-   if (new_tid != 255) {
+   if (s->value <= 0) {
+      old_tid = get_thread_id();
+      sysArray.currThread = pop_from_sem_waitlist(s);
+
       sysArray.array[old_tid].thread_status = THREAD_READY;
-      sysArray.array[new_tid].thread_status = THREAD_RUNNING;
-      context_switch((uint16_t*)&sysArray.array[new_tid].stackPtr,
+      sysArray.array[sysArray.currThread].thread_status = THREAD_RUNNING;
+      sysArray.sched_counts[sysArray.currThread]++;
+
+      context_switch((uint16_t*)&sysArray.array[sysArray.currThread].stackPtr,
       (uint16_t*)&sysArray.array[old_tid].stackPtr);
    }
    //enable interrupts
