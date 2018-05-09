@@ -11,10 +11,10 @@
 
 extern system_t sysArray;
 
-uint16_t production_rate = 50;
-uint16_t consumption_rate = 100;
-
 uint8_t buffer[BUFFER_SIZE];
+
+uint16_t production_rate = 100;
+uint16_t consumption_rate = 500;
 
 mutex_t mutex_screen;
 mutex_t mutex_buffer;
@@ -77,12 +77,12 @@ void producer() {
 
 //TODO if consumer gets below 0 everything freezes up
 void consumer() {
-   uint8_t i;
+   //uint8_t i;
+   //thread_sleep(100);
 
-   while(1) {
+   while(1) {/*
       //wait until there are items in the buffer
       sem_wait(&sem_full);
-
       //remove item from the buffer
       mutex_lock(&mutex_buffer);
       for (i = 0; i < sem_full.value; i++) {
@@ -90,11 +90,10 @@ void consumer() {
       }
       buffer[sem_full.value] = 0;
       mutex_unlock(&mutex_buffer);
-      
       //consume an item
       thread_sleep(consumption_rate);
       //indicate that there is one less item in the buffer
-      sem_signal(&sem_empty);
+      sem_signal(&sem_empty);*/
    }
 }
 
@@ -288,7 +287,5 @@ void main(void) {
    sei();
 
    //idle loop
-   while(1) {
-      print_string("i");
-   }
+   while(1) {}
 }

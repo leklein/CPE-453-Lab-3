@@ -56,12 +56,8 @@ void mutex_lock(struct mutex_t* m) {
    uint8_t tid;
    //disable interrupts
    cli();
-   //print_string("in mutex lock- beginning");
    //get current thread id
    tid = get_thread_id();
-   //print_string("[tid in lock: ");
-   //print_int(tid);
-   //print_string("]\n");
    //if mutex lock is in use by the same thread, do nothing
    //if it is in use by a different thread, add to waitlist
    if (m->is_locked) { 
@@ -71,14 +67,9 @@ void mutex_lock(struct mutex_t* m) {
          sysArray.array[tid].thread_status = THREAD_WAITING;
          yield();
       }
-      else {
-         //print_string("-mutex lock 0-");
-      }
-      //print_string("-mutex lock 3-");
    }
    //if mutex lock is not in use, give it to the thread
    else {
-      //print_string("-mutex lock 2-");
       m->is_locked = 1;
       m->owner_tid = tid;
    }
