@@ -8,16 +8,23 @@
 #include "synchro.h"
 
 #define BUFFER_SIZE 10
+#define BUFFER_TOP_ROW 2
+#define BUFFER_COLUMN 18
 
 extern system_t sysArray;
 
-uint8_t buffer[BUFFER_SIZE];
+uint8_t buffer_count = 0;
 
 uint16_t production_rate = 100;
-uint16_t consumption_rate = 500;
+uint16_t consumption_rate = 200;
+
+uint8_t production_animation_phase = 0;
+uint8_t consumption_animation_phase = 0;
 
 mutex_t mutex_screen;
 mutex_t mutex_buffer;
+mutex_t mutex_production_animation;
+mutex_t mutex_consumption_animation;
 semaphore_t sem_full;
 semaphore_t sem_empty; 
 
@@ -63,12 +70,17 @@ void blink() {
 void producer() {
    while(1) {
       //produce an item
-      thread_sleep(production_rate);
+      thread_sleep(production_rate/5);
+      production_animation_phase = 1;
+      thread_sleep(production_rate/5);
+      production_animation_phase = 2;
+      thread_sleep(production_rate*3/5);
+      production_animation_phase = 0;
       //wait until there is space for the new item
       sem_wait(&sem_empty);
       //add new item to the buffer
       mutex_lock(&mutex_buffer);
-      buffer[sem_full.value] = 1;
+      buffer_count++;
       mutex_unlock(&mutex_buffer);
       //indicate that there is another item in the buffer
       sem_signal(&sem_full);
@@ -77,23 +89,24 @@ void producer() {
 
 //TODO if consumer gets below 0 everything freezes up
 void consumer() {
-   //uint8_t i;
-   //thread_sleep(100);
+   uint8_t i;
 
-   while(1) {/*
+   while(1) {
       //wait until there are items in the buffer
       sem_wait(&sem_full);
       //remove item from the buffer
       mutex_lock(&mutex_buffer);
-      for (i = 0; i < sem_full.value; i++) {
-         buffer[i] = buffer[i+1];
-      }
-      buffer[sem_full.value] = 0;
+      buffer_count--;
       mutex_unlock(&mutex_buffer);
-      //consume an item
-      thread_sleep(consumption_rate);
       //indicate that there is one less item in the buffer
-      sem_signal(&sem_empty);*/
+      sem_signal(&sem_empty);
+      //consume an item
+      thread_sleep(consumption_rate/5);
+      consumption_animation_phase = 1;
+      thread_sleep(consumption_rate/5);
+      consumption_animation_phase = 2;
+      thread_sleep(consumption_rate*3/5);
+      consumption_animation_phase = 0;
    }
 }
 
@@ -197,7 +210,7 @@ void display_stats(uint8_t *str) {
 }
 
 void display_buffer_box(uint8_t row, uint8_t value) {
-   set_cursor(row, 18);
+   set_cursor(BUFFER_TOP_ROW + row, BUFFER_COLUMN);
    print_string("| ");
    if (value == 0) print_string(" ");
    else print_string("O");
@@ -205,14 +218,48 @@ void display_buffer_box(uint8_t row, uint8_t value) {
 }
 
 void display_buffer_info() {
-   set_cursor(12, 1);
+   set_cursor(13, 1);
+   if (production_animation_phase == 1) set_color(YELLOW);
+   else set_color(RED);
    print_string("Production Rate: ");
    print_int(production_rate*10);
    print_string(" ms     ");
-   set_cursor(13, 1);
+
+   set_cursor(14, 1);
+   if (consumption_animation_phase == 1) set_color(YELLOW);
+   else set_color(RED);
    print_string("Consumption Rate: ");
    print_int(consumption_rate*10);
    print_string(" ms     ");
+
+   set_color(RED);
+}
+
+void display_buffer_animations() {
+   uint8_t i = 0;
+   //draw production animation
+   /*
+   if (production_animation_phase > 0) {
+      set_cursor(BUFFER_TOP_ROW, BUFFER_COLUMN-7);
+      for (i = 0; i < production_animation_phase; i++) {
+         print_string(" ");
+      }
+      print_string("O");
+   }*/
+   //draw consumption animation
+   /*if(consumption_animation_phase > 0) {
+      set_cursor(BUFFER_TOP_ROW, BUFFER_COLUMN+2);
+      for (i = 0; i < consumption_animation_phase; i++) {
+         print_string(" ");
+      }
+      if (consumption_animation_phase)
+      print_string("O");
+   }
+   else {
+      set_cursor(BUFFER_TOP_ROW, BUFFER_COLUMN+5);
+      print_string(" ");
+   }
+   print_string("     ");*/
 }
 
 void display_buffer() {
@@ -220,28 +267,22 @@ void display_buffer() {
 
    while(1) {
       mutex_lock(&mutex_screen);
-      mutex_lock(&mutex_buffer);
 
       set_color(RED);
-      set_cursor(20, 1);
-      print_int(buffer[0]);
-      print_int(buffer[1]);
-      print_int(buffer[2]);
-      print_int(buffer[3]);
-      print_int(buffer[4]);
-      print_int(buffer[5]);
-      print_int(buffer[6]);
-      print_int(buffer[7]);
-      print_int(buffer[8]);
-      print_int(buffer[9]);
 
-      for (buffer_row = 1; buffer_row <= BUFFER_SIZE; buffer_row++) {
-         display_buffer_box(buffer_row, buffer[buffer_row-1]);
+      mutex_lock(&mutex_buffer);
+
+      for (buffer_row = 0; buffer_row < buffer_count; buffer_row++) {
+         display_buffer_box(buffer_row, 1);
+      }
+      for (buffer_row = buffer_count; buffer_row < BUFFER_SIZE; buffer_row++) {
+         display_buffer_box(buffer_row, 0);
       }
 
       mutex_unlock(&mutex_buffer);
 
       display_buffer_info();
+      display_buffer_animations();
 
       mutex_unlock(&mutex_screen);
    }
@@ -256,6 +297,8 @@ void main(void) {
    //initialize all mutexes/semaphores
    mutex_init(&mutex_screen);
    mutex_init(&mutex_buffer);
+   mutex_init(&mutex_production_animation);
+   mutex_init(&mutex_consumption_animation);
    sem_init(&sem_full, 0);
    sem_init(&sem_empty, BUFFER_SIZE);
 
@@ -278,9 +321,6 @@ void main(void) {
    create_thread("stats", (uint16_t)display_stats, (void*)string, 50);
    create_thread("buffer", (uint16_t)display_buffer, (void*)NULL, 50);
    create_thread("blink", (uint16_t)blink, (void*)NULL, 50);
-
-   //initially clear buffer
-   for(i = 0; i < BUFFER_SIZE; i++) buffer[i] = 0;
 
    os_start();
 
