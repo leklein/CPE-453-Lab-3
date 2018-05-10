@@ -13,12 +13,8 @@ uint8_t arr[128];
 semaphore_t semaphore;   
 extern system_t sysArray;
 
-
-uint16_t production_rate = 100;
-uint16_t consumption_rate = 500;
-
 mutex_t mutex_screen;
-mutex_t mutex_buffer;
+
 
 void display_id_name_and_schedule(uint8_t row, thread_t* t) {
     set_cursor(row, 40);
@@ -104,6 +100,7 @@ void merge(uint8_t low, uint8_t mid, uint8_t high) {
         arr[k++] = r[j++];
     }
 
+
 }
 
 void merge_t(uint8_t low, uint8_t high) {
@@ -111,6 +108,7 @@ void merge_t(uint8_t low, uint8_t high) {
     uint8_t mid = low + (high - low) / 2;
     
     if (low < high) {
+
         merge_t(low, mid);
         merge_t(mid + 1, high);
         merge(low, mid, high);
@@ -133,12 +131,13 @@ void sort_t(uint8_t low, uint8_t high) {
         merge_t(mid + 1, high);
         merge(low, mid, high);
     }   
+
+    
 }
 
 
 
 void mt_sort(uint8_t* array) {
-    // launch 3 threads
 
     uint8_t tid = get_thread_id();
     uint8_t low = 0;
@@ -147,26 +146,27 @@ void mt_sort(uint8_t* array) {
  
 
     
-    if (tid == 1) {
+    if (tid == 2) {
         low = 0;
         high = 31;
-    } else if (tid == 2) {
+    } else if (tid == 3) {
         low = 32;
         high = 63;
-    } else if (tid == 3) {
+    } else if (tid == 4) {
         low = 64;
         high = 95;
-    } else if (tid == 4) {
+    } else if (tid == 5) {
         low = 96;
         high = 127;
     }
 
     sort_t(low, high);
 
-    print_string("After sort ");
-    print_string("tid:" );
+    set_cursor(42, 0);
+    print_string("current tid: ");
     print_int(tid);
 
+    
     sem_wait(&semaphore);
     //sem_signal(&semaphore);
 }
@@ -177,13 +177,6 @@ void display_stats(uint8_t *str) {
     clear_screen();
  
     while(1) {
-       if (byte_available()) {
-          b = read_byte();
-          if (b == 'f' && production_rate < 1000) production_rate += 5;
-          else if (b == 'r' && production_rate > 5) production_rate -= 5;
-          else if (b == 'j' && consumption_rate < 1000) consumption_rate += 5;
-          else if (b == 'u' && consumption_rate > 5) consumption_rate -= 5;
-       }
  
        mutex_lock(&mutex_screen);
  
@@ -216,13 +209,22 @@ void display_stats(uint8_t *str) {
  }
 
 void display_array(uint8_t *arr) {
-     uint8_t i;
-     //print_string("\n");
-     for (i = 0; i < 128; i++) {
-         print_int(arr[i]);
-         print_string(" ");
-     }
-     //print_string("\n");
+   
+    while (1) {
+        mutex_lock(&mutex_screen);
+        set_cursor(80, 40); // print array after the thread stats
+        set_color(YELLOW);
+        uint8_t i;
+        for (i = 0; i < 128; i++) {
+            print_int(arr[i]);
+            print_string(" ");
+        }
+        //sem_wait(&semaphore);
+
+        mutex_unlock(&mutex_screen);
+        yield();
+    }
+
 }
 
 
@@ -230,8 +232,6 @@ void display_array(uint8_t *arr) {
 int main(char **argv) {
 
     os_init();
-    clear_screen();
-
 
     // populate the array
     uint8_t i;
@@ -240,7 +240,6 @@ int main(char **argv) {
         arr[i] = rand() % 128;
     }    
 
-    display_array(arr);
     sem_init(&semaphore, 0);
 
     //sem_wait(&semaphore);
@@ -256,47 +255,24 @@ int main(char **argv) {
     sysArray.array[0].size = 0;
  
     sysArray.threadsUsed++;
-
-
-    create_thread("display_stats", (uint16_t) display_stats, (void*) "test", 200);
-    create_thread("thread1", (uint16_t) mt_sort, (void*)arr, 200);
-    create_thread("thread2", (uint16_t) mt_sort, (void*)arr, 200); 
-    create_thread("thread3", (uint16_t) mt_sort, (void*)arr, 200);
-    create_thread("thread4", (uint16_t) mt_sort, (void*)arr, 200);
-    create_thread("display_array", (uint16_t) display_array, (void*) arr, 200);
+    clear_screen();
 
     
+    
 
-    //display_stats("test");
+    
+    create_thread("display_stats", (uint16_t) display_stats, (void*) "Multithreaded sort", 200);
+
+
+    create_thread("sort1", (uint16_t) mt_sort, (void*)arr, 200);
+    create_thread("sort2", (uint16_t) mt_sort, (void*)arr, 200); 
+    create_thread("sort3", (uint16_t) mt_sort, (void*)arr, 200);
+    create_thread("sort4", (uint16_t) mt_sort, (void*)arr, 200);
+    create_thread("display_array", (uint16_t) display_array, (void*) arr, 200);
+
 
     os_start();
 
-    //display_array(arr);
-    //print_string("should be done sorting");
-
-   
-    _delay_ms(1000);
-   
-   
-
-  
-   
-
-
-    //mt_sort(arr);
-
-   /* set_cursor(10, 0);
-
-    print_string("sorted: ");
-
-    display_array(arr);
-
-    set_cursor(15, 0);
-
-    set_cursor(20, 0);
-    uint8_t t = get_thread_id();
-    print_string("tid:");
-    print_int(t);*/
 
 
     return 0;
